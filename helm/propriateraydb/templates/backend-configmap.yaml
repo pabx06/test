@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "propriateraydb.fullname" . }}-backend-config
+  labels:
+    {{- include "propriateraydb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+data:
+  PORT: "{{ .Values.backend.service.port }}"
+  NODE_ENV: {{ .Values.backend.config.nodeEnv | quote }}
+  LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
+  AUTH_MODE: {{ .Values.backend.auth.mode | quote }}
+  SESSION_STORE: {{ .Values.backend.auth.sessionStore | quote }}
+  DB_HOST: {{ include "propriateraydb.fullname" . }}-mariadb
+  DB_PORT: {{ .Values.mariadb.service.port | quote }}
+  DB_NAME: {{ .Values.mariadb.database | quote }}
+  DB_USER: {{ .Values.mariadb.username | quote }}
+  REDIS_HOST: {{ ternary (printf "%s-redis" (include "propriateraydb.fullname" .)) "" .Values.redis.enabled | quote }}
+  REDIS_PORT: {{ .Values.redis.service.port | quote }}

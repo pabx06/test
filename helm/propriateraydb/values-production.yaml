@@ -1,0 +1,32 @@
+frontend:
+  replicas: 1
+  image:
+    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/frontend
+    digest: ""
+    pullPolicy: IfNotPresent
+  route:
+    enabled: true
+
+backend:
+  replicas: 1
+  image:
+    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/backend
+    digest: ""
+    pullPolicy: IfNotPresent
+  auth:
+    mode: saml
+    sessionStore: redis
+  config:
+    nodeEnv: production
+    logLevel: info
+
+mariadb:
+  enabled: true
+  persistence:
+    storage: 10Gi
+
+redis:
+  enabled: true
+  persistence:
+    enabled: true
+    storage: 1Gi

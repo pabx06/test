@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "propriateraydb.fullname" . }}-frontend
+  labels:
+    {{- include "propriateraydb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  selector:
+    {{- include "propriateraydb.componentLabels" (dict "component" "frontend" "Chart" .Chart "Release" .Release "Values" .Values) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: 80

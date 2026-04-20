@@ -1,0 +1,46 @@
+{{- if .Values.mariadb.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "propriateraydb.fullname" . }}-mariadb
+  labels:
+    {{- include "propriateraydb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mariadb
+spec:
+  serviceName: {{ include "propriateraydb.fullname" . }}-mariadb
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "propriateraydb.componentLabels" (dict "component" "mariadb" "Chart" .Chart "Release" .Release "Values" .Values) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "propriateraydb.componentLabels" (dict "component" "mariadb" "Chart" .Chart "Release" .Release "Values" .Values) | nindent 8 }}
+    spec:
+      containers:
+        - name: mariadb
+          image: {{ .Values.mariadb.image.repository }}:{{ .Values.mariadb.image.tag }}
+          imagePullPolicy: {{ .Values.mariadb.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.mariadb.service.port }}
+          envFrom:
+            - secretRef:
+                name: {{ include "propriateraydb.fullname" . }}-mariadb-secrets
+          resources:
+            {{- toYaml .Values.mariadb.resources | nindent 12 }}
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: mariadb-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.mariadb.persistence.storageClassName }}
+        storageClassName: {{ .Values.mariadb.persistence.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.mariadb.persistence.storage }}
+{{- end }}

@@ -1,0 +1,23 @@
+frontend:
+  replicas: 1
+  route:
+    enabled: true
+
+backend:
+  replicas: 1
+  auth:
+    mode: saml
+    sessionStore: redis
+  config:
+    nodeEnv: production
+    logLevel: debug
+
+mariadb:
+  enabled: true
+  persistence:
+    storage: 5Gi
+
+redis:
+  enabled: true
+  persistence:
+    enabled: false

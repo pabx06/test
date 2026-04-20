@@ -1,0 +1,129 @@
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: false
+  name: ""
+
+networkPolicy:
+  enabled: true
+
+frontend:
+  replicas: 1
+  image:
+    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/frontend
+    tag: latest
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  route:
+    enabled: true
+    host: ""
+    tls:
+      enabled: true
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+  probes:
+    readiness:
+      path: /
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /
+      initialDelaySeconds: 15
+      periodSeconds: 20
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+backend:
+  replicas: 1
+  image:
+    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/backend
+    tag: latest
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    port: 3000
+  auth:
+    mode: saml
+    sessionStore: redis
+  config:
+    nodeEnv: production
+    logLevel: info
+  probes:
+    startup:
+      path: /health/startup
+      failureThreshold: 30
+      periodSeconds: 10
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 15
+      periodSeconds: 20
+  secrets:
+    sessionSecret: change-me
+    samlEntryPoint: https://idp.example.com/saml
+    samlIssuer: propriateraydb-backend
+    samlCallbackUrl: https://propriateraydb.example.com/login/callback
+    samlCert: replace-me
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+mariadb:
+  enabled: true
+  image:
+    repository: mariadb
+    tag: "10.11"
+    pullPolicy: IfNotPresent
+  service:
+    port: 3306
+  database: propriateraydb
+  username: propriateraydb
+  password: propriateraydb
+  rootPassword: root
+  persistence:
+    storage: 10Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 6379
+  password: ""
+  persistence:
+    enabled: true
+    storage: 1Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

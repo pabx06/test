@@ -1,0 +1,17 @@
+{{- if .Values.mariadb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "propriateraydb.fullname" . }}-mariadb
+  labels:
+    {{- include "propriateraydb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mariadb
+spec:
+  clusterIP: None
+  selector:
+    {{- include "propriateraydb.componentLabels" (dict "component" "mariadb" "Chart" .Chart "Release" .Release "Values" .Values) | nindent 4 }}
+  ports:
+    - name: mysql
+      port: {{ .Values.mariadb.service.port }}
+      targetPort: {{ .Values.mariadb.service.port }}
+{{- end }}

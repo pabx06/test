@@ -1,0 +1,13 @@
+build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  only:
+    - main
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build -t "$IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA" ./frontend
+    - docker build -t "$IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA" ./backend
+    - docker push "$IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA"
+    - docker push "$IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA"

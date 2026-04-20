@@ -1,0 +1,7 @@
+services:
+  backend:
+    environment:
+      NODE_ENV: test
+      LOG_LEVEL: silent
+      SESSION_STORE: memory
+      AUTH_MODE: mock

@@ -1,0 +1,8 @@
+lint:
+  stage: lint
+  image: alpine:3.20
+  script:
+    - test -f docker-compose.yml
+    - test -f .gitlab-ci.yml
+    - test -f backend/src/config/logger.ts
+    - test -f helm/propriateraydb/Chart.yaml
