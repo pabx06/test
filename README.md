@@ -850,6 +850,125 @@ Si activé :
 - persistance facultative selon usage
 - pas de HA nécessaire au départ
 
+## Runbook incident OpenShift
+
+Cette procédure sert quand un déploiement provoque une erreur massive, des crashloops, une saturation de logs, ou un comportement dangereux pour les dépendances. L'ordre recommandé est : stopper le flux si nécessaire, préserver les preuves, rollback, puis nettoyer.
+
+### 1. Identifier le contexte
+
+```bash
+export NS="propriateraydb-recette"
+export RELEASE="propriateraydb"
+oc project "$NS"
+oc get pods
+oc get deploy,statefulset,svc,route
+helm status "$RELEASE" -n "$NS"
+helm history "$RELEASE" -n "$NS"
+```
+
+### 2. Stopper le trafic si l'incident est actif
+
+Si le backend surcharge une dépendance, génère une tempête d'erreurs, ou doit être arrêté immédiatement :
+
+```bash
+oc scale deployment/propriateraydb-backend --replicas=0 -n "$NS"
+```
+
+Si le problème vient du frontend public, il est aussi possible de couper temporairement le frontend :
+
+```bash
+oc scale deployment/propriateraydb-frontend --replicas=0 -n "$NS"
+```
+
+Privilégier un rollback direct si la version précédente est connue comme saine.
+
+### 3. Préserver les preuves avant nettoyage
+
+Ne pas supprimer les pods avant d'avoir récupéré les informations minimales :
+
+```bash
+oc get pods -n "$NS"
+oc logs deployment/propriateraydb-backend -n "$NS" --tail=500
+oc logs deployment/propriateraydb-frontend -n "$NS" --tail=500
+oc describe pod <pod-name> -n "$NS"
+oc get events -n "$NS" --sort-by=.lastTimestamp
+helm get values "$RELEASE" -n "$NS"
+helm get manifest "$RELEASE" -n "$NS" > "manifest-${RELEASE}.yaml"
+```
+
+Si une stack centralisée existe, noter l'intervalle d'incident, le namespace, la release Helm et le digest d'image déployé.
+
+### 4. Rollback Helm
+
+Le cas nominal est de revenir à la dernière révision saine :
+
+```bash
+helm history "$RELEASE" -n "$NS"
+helm rollback "$RELEASE" <revision_saîne> -n "$NS"
+oc rollout status deployment/propriateraydb-backend -n "$NS"
+oc rollout status deployment/propriateraydb-frontend -n "$NS"
+```
+
+Après rollback, vérifier les endpoints :
+
+```bash
+oc get route -n "$NS"
+oc logs deployment/propriateraydb-backend -n "$NS" --tail=100
+oc logs deployment/propriateraydb-frontend -n "$NS" --tail=100
+```
+
+### 5. Nettoyage sûr
+
+Actions généralement sûres :
+
+- supprimer des pods crashlooping après collecte des logs
+- redémarrer un deployment après correction de configuration
+- supprimer des ReplicaSets anciens si le rollback n'est plus nécessaire
+- supprimer des ConfigMaps ou Secrets temporaires créés manuellement
+
+Commandes utiles :
+
+```bash
+oc delete pod -l app.kubernetes.io/component=backend -n "$NS"
+oc rollout restart deployment/propriateraydb-backend -n "$NS"
+oc rollout restart deployment/propriateraydb-frontend -n "$NS"
+```
+
+Actions à éviter sans validation explicite :
+
+- supprimer des `PVC`
+- supprimer les données MariaDB
+- modifier ou supprimer le montage NAS
+- supprimer des Secrets applicatifs sans sauvegarde
+- supprimer la Route ou changer le DNS pendant l'incident
+- supprimer les anciennes images Harbor nécessaires à un rollback
+
+### 6. Cas release Helm bloquée
+
+Si Helm est dans un état incohérent :
+
+```bash
+helm status "$RELEASE" -n "$NS"
+helm list -n "$NS"
+helm get all "$RELEASE" -n "$NS" > "helm-${RELEASE}-debug.txt"
+```
+
+En dernier recours seulement :
+
+```bash
+helm uninstall "$RELEASE" -n "$NS"
+```
+
+Cette commande supprime les ressources gérées par Helm. Elle ne doit pas être utilisée comme premier réflexe si un rollback est possible. Vérifier les `PVC` et la politique de rétention avant toute suppression de données.
+
+### 7. Post-incident
+
+- identifier le commit, les digests image et la révision Helm en cause
+- vérifier si la quality gate, le smoke test ou les probes auraient dû détecter le problème
+- créer une action corrective dans le Kanban
+- conserver les images nécessaires au rollback jusqu'à clôture de l'incident
+- documenter la cause, l'impact, la correction et le test de non-régression
+
 ## Helm
 
 ### Exemple de `values-production.yaml`
