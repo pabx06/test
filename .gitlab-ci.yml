@@ -1,16 +1,25 @@
 include:
   - local: .gitlab/ci/lint.yml
   - local: .gitlab/ci/test.yml
+  - local: .gitlab/ci/quality.yml
   - local: .gitlab/ci/build.yml
   - local: .gitlab/ci/deploy.yml
 
 stages:
   - lint
   - test
+  - quality
+  - smoke
   - build
   - deploy
 
 variables:
-  REGISTRY: registry.gitlab.com/ton-groupe/propriateraydb-app
+  HARBOR_REGISTRY: harbor.example.com
+  HARBOR_PROJECT: propriateraydb
+  REGISTRY: $HARBOR_REGISTRY/$HARBOR_PROJECT
   IMAGE_FRONTEND: $REGISTRY/frontend
   IMAGE_BACKEND: $REGISTRY/backend
+  CI_TOOLS_IMAGE: $REGISTRY/ci-tools:ubi9
+  KANIKO_IMAGE: gcr.io/kaniko-project/executor:v1.23.2-debug
+  SONAR_SCANNER_IMAGE: sonarsource/sonar-scanner-cli:5.0.1
+  OPENSHIFT_NAMESPACE: propriateraydb

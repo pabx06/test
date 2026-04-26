@@ -51,8 +51,8 @@ authRouter.get("/login", (_request, response) => {
   }
 
   response.status(501).json({
-    error: "saml_not_wired",
-    message: "SAML routes are scaffolded but the IdP integration is not yet implemented"
+    error: "oidc_not_wired",
+    message: "OpenID Connect routes are scaffolded but the IdP integration is not yet implemented"
   });
 });
 

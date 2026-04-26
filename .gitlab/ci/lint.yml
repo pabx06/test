@@ -1,8 +1,13 @@
 lint:
   stage: lint
-  image: alpine:3.20
+  image: $CI_TOOLS_IMAGE
   script:
     - test -f docker-compose.yml
+    - test -f docker/dev/Dockerfile
+    - test -x scripts/smoke-compose.sh
+    - test -f .npmrc.example
+    - test -f sonar-project.properties
+    - test -f .gitlab/ci/quality.yml
     - test -f .gitlab-ci.yml
     - test -f backend/src/config/logger.ts
     - test -f helm/propriateraydb/Chart.yaml

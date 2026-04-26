@@ -1,13 +1,21 @@
 deploy:
   stage: deploy
-  image: alpine/helm:3.15.4
+  image: $CI_TOOLS_IMAGE
+  needs:
+    - job: build
+      artifacts: true
   only:
     - main
+  before_script:
+    - oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --insecure-skip-tls-verify="${OPENSHIFT_INSECURE_SKIP_TLS_VERIFY:-false}"
+    - oc project "$OPENSHIFT_NAMESPACE" || oc new-project "$OPENSHIFT_NAMESPACE"
   script:
     - |
       helm upgrade --install propriateraydb ./helm/propriateraydb \
-        --namespace "${OC_NAMESPACE:-propriateraydb}" \
-        --create-namespace \
+        --namespace "$OPENSHIFT_NAMESPACE" \
         -f ./helm/propriateraydb/values-production.yaml \
+        --set frontend.image.repository="${IMAGE_FRONTEND}" \
+        --set backend.image.repository="${IMAGE_BACKEND}" \
+        --set-string frontend.route.host="${OPENSHIFT_ROUTE_HOST}" \
         --set frontend.image.digest="${FRONTEND_IMAGE_DIGEST}" \
         --set backend.image.digest="${BACKEND_IMAGE_DIGEST}"

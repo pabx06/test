@@ -31,6 +31,12 @@ spec:
                 name: {{ include "propriateraydb.fullname" . }}-backend-config
             - secretRef:
                 name: {{ include "propriateraydb.fullname" . }}-backend-secrets
+          {{- if .Values.backend.nas.enabled }}
+          volumeMounts:
+            - name: nas-xml
+              mountPath: {{ .Values.backend.nas.mountPath | quote }}
+              readOnly: {{ .Values.backend.nas.readOnly }}
+          {{- end }}
           startupProbe:
             httpGet:
               path: {{ .Values.backend.probes.startup.path }}
@@ -55,3 +61,9 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+      {{- if .Values.backend.nas.enabled }}
+      volumes:
+        - name: nas-xml
+          persistentVolumeClaim:
+            claimName: {{ required "backend.nas.existingClaim is required when backend.nas.enabled=true" .Values.backend.nas.existingClaim }}
+      {{- end }}

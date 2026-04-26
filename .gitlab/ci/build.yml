@@ -1,13 +1,36 @@
 build:
   stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
   only:
     - main
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - |
+      HARBOR_AUTH="$(printf "%s:%s" "$HARBOR_USERNAME" "$HARBOR_PASSWORD" | base64 | tr -d '\n')"
+      cat > /kaniko/.docker/config.json <<EOF
+      {"auths":{"${HARBOR_REGISTRY}":{"auth":"${HARBOR_AUTH}"}}}
+      EOF
+    - |
+      NPMRC_PATH="${CI_PROJECT_DIR}/backend/.npmrc.example"
+      : > "$NPMRC_PATH"
+      if [ -n "${NPM_REGISTRY_URL:-}" ]; then
+        printf "registry=%s\n" "$NPM_REGISTRY_URL" > "$NPMRC_PATH"
+        if [ -n "${NPM_TOKEN:-}" ] && [ -n "${NPM_REGISTRY_AUTH_PATH:-}" ]; then
+          printf "//%s:_authToken=%s\n" "$NPM_REGISTRY_AUTH_PATH" "$NPM_TOKEN" >> "$NPMRC_PATH"
+          printf "always-auth=true\n" >> "$NPMRC_PATH"
+        fi
+        printf "strict-ssl=%s\n" "${NPM_STRICT_SSL:-true}" >> "$NPMRC_PATH"
+      else
+        printf "registry=https://registry.npmjs.org/\nstrict-ssl=true\n" > "$NPMRC_PATH"
+      fi
   script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
-    - docker build -t "$IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA" ./frontend
-    - docker build -t "$IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA" ./backend
-    - docker push "$IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA"
-    - docker push "$IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA"
+    - /kaniko/executor --context "${CI_PROJECT_DIR}/frontend" --dockerfile "${CI_PROJECT_DIR}/frontend/Dockerfile" --destination "${IMAGE_FRONTEND}:${CI_COMMIT_SHORT_SHA}" --digest-file frontend.digest --cache=false
+    - /kaniko/executor --context "${CI_PROJECT_DIR}/backend" --dockerfile "${CI_PROJECT_DIR}/backend/Dockerfile" --destination "${IMAGE_BACKEND}:${CI_COMMIT_SHORT_SHA}" --digest-file backend.digest --cache=false
+    - FRONTEND_IMAGE_DIGEST="$(cat frontend.digest)"
+    - BACKEND_IMAGE_DIGEST="$(cat backend.digest)"
+    - printf "FRONTEND_IMAGE_DIGEST=%s\nBACKEND_IMAGE_DIGEST=%s\n" "$FRONTEND_IMAGE_DIGEST" "$BACKEND_IMAGE_DIGEST" > build.env
+  artifacts:
+    reports:
+      dotenv: build.env

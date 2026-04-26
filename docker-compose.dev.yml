@@ -1,4 +1,23 @@
 services:
+  devtools:
+    profiles: ["devtools"]
+    build:
+      context: .
+      dockerfile: docker/dev/Dockerfile
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+    environment:
+      NPM_REGISTRY_URL: ${NPM_REGISTRY_URL:-}
+      NPM_REGISTRY_AUTH_PATH: ${NPM_REGISTRY_AUTH_PATH:-}
+      NPM_TOKEN: ${NPM_TOKEN:-}
+      OPENSHIFT_SERVER: ${OPENSHIFT_SERVER:-}
+      OPENSHIFT_NAMESPACE: ${OPENSHIFT_NAMESPACE:-propriateraydb}
+      HARBOR_REGISTRY: ${HARBOR_REGISTRY:-}
+      HARBOR_PROJECT: ${HARBOR_PROJECT:-propriateraydb}
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+
   backend:
     environment:
       NODE_ENV: development
