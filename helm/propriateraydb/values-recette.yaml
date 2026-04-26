@@ -6,7 +6,7 @@ frontend:
 backend:
   replicas: 1
   auth:
-    mode: saml
+    mode: oidc
     sessionStore: redis
   config:
     nodeEnv: production

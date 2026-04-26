@@ -12,7 +12,7 @@ networkPolicy:
 frontend:
   replicas: 1
   image:
-    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/frontend
+    repository: harbor.example.com/propriateraydb/frontend
     tag: latest
     digest: ""
     pullPolicy: IfNotPresent
@@ -45,18 +45,28 @@ frontend:
 backend:
   replicas: 1
   image:
-    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/backend
+    repository: harbor.example.com/propriateraydb/backend
     tag: latest
     digest: ""
     pullPolicy: IfNotPresent
   service:
     port: 3000
   auth:
-    mode: saml
+    mode: oidc
     sessionStore: redis
   config:
     nodeEnv: production
     logLevel: info
+  oidc:
+    issuerUrl: https://idp.example.com/realms/propriateraydb
+    clientId: propriateraydb-backend
+    redirectUri: https://propriateraydb.example.com/auth/callback
+    scope: openid profile email
+  nas:
+    enabled: false
+    existingClaim: ""
+    mountPath: /mnt/nas/xml
+    readOnly: true
   probes:
     startup:
       path: /health/startup
@@ -72,10 +82,7 @@ backend:
       periodSeconds: 20
   secrets:
     sessionSecret: change-me
-    samlEntryPoint: https://idp.example.com/saml
-    samlIssuer: propriateraydb-backend
-    samlCallbackUrl: https://propriateraydb.example.com/login/callback
-    samlCert: replace-me
+    oidcClientSecret: change-me
   resources:
     requests:
       cpu: 100m

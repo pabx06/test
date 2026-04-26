@@ -1,7 +1,83 @@
 test:
   stage: test
-  image: node:22-alpine
+  image: $CI_TOOLS_IMAGE
+  before_script:
+    - |
+      NPMRC_PATH="$HOME/.npmrc"
+      : > "$NPMRC_PATH"
+      if [ -n "${NPM_REGISTRY_URL:-}" ]; then
+        printf "registry=%s\n" "$NPM_REGISTRY_URL" > "$NPMRC_PATH"
+        if [ -n "${NPM_TOKEN:-}" ] && [ -n "${NPM_REGISTRY_AUTH_PATH:-}" ]; then
+          printf "//%s:_authToken=%s\n" "$NPM_REGISTRY_AUTH_PATH" "$NPM_TOKEN" >> "$NPMRC_PATH"
+          printf "always-auth=true\n" >> "$NPMRC_PATH"
+        fi
+        printf "strict-ssl=%s\n" "${NPM_STRICT_SSL:-true}" >> "$NPMRC_PATH"
+      fi
   script:
     - cd backend
     - npm ci
     - npm run build
+
+smoke_backend_services:
+  stage: smoke
+  image: $CI_TOOLS_IMAGE
+  services:
+    - name: mariadb:10.11
+      alias: db
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    MYSQL_ROOT_PASSWORD: root
+    MYSQL_DATABASE: propriateraydb
+    MYSQL_USER: propriateraydb
+    MYSQL_PASSWORD: propriateraydb
+    NODE_ENV: test
+    LOG_LEVEL: info
+    PORT: "3000"
+    AUTH_MODE: mock
+    SESSION_STORE: redis
+    SESSION_SECRET: ci-smoke-session-secret
+    DB_HOST: db
+    DB_PORT: "3306"
+    DB_NAME: propriateraydb
+    DB_USER: propriateraydb
+    DB_PASSWORD: propriateraydb
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_PASSWORD: ""
+  before_script:
+    - |
+      NPMRC_PATH="$HOME/.npmrc"
+      : > "$NPMRC_PATH"
+      if [ -n "${NPM_REGISTRY_URL:-}" ]; then
+        printf "registry=%s\n" "$NPM_REGISTRY_URL" > "$NPMRC_PATH"
+        if [ -n "${NPM_TOKEN:-}" ] && [ -n "${NPM_REGISTRY_AUTH_PATH:-}" ]; then
+          printf "//%s:_authToken=%s\n" "$NPM_REGISTRY_AUTH_PATH" "$NPM_TOKEN" >> "$NPMRC_PATH"
+          printf "always-auth=true\n" >> "$NPMRC_PATH"
+        fi
+        printf "strict-ssl=%s\n" "${NPM_STRICT_SSL:-true}" >> "$NPMRC_PATH"
+      fi
+  script:
+    - cd backend
+    - npm ci
+    - npm run build
+    - npm start > ../backend-smoke.log 2>&1 &
+    - echo "$!" > ../backend-smoke.pid
+    - cd ..
+    - |
+      deadline=$((SECONDS + 120))
+      until curl -fsS http://localhost:3000/health/ready; do
+        if [ "$SECONDS" -ge "$deadline" ]; then
+          echo "Timed out waiting for backend readiness" >&2
+          cat backend-smoke.log >&2 || true
+          exit 1
+        fi
+        sleep 2
+      done
+    - curl -fsS http://localhost:3000/api/health | grep -q propriateraydb-backend
+  after_script:
+    - if [ -f backend-smoke.pid ]; then kill "$(cat backend-smoke.pid)" 2>/dev/null || true; fi
+  artifacts:
+    when: on_failure
+    paths:
+      - backend-smoke.log

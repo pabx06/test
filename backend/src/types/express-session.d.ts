@@ -6,7 +6,7 @@ declare module "express-session" {
       username: string;
       displayName: string;
       roles: string[];
-      authMode: "mock" | "saml";
+      authMode: "mock" | "oidc";
     };
   }
 }

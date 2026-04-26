@@ -11,6 +11,11 @@ data:
   LOG_LEVEL: {{ .Values.backend.config.logLevel | quote }}
   AUTH_MODE: {{ .Values.backend.auth.mode | quote }}
   SESSION_STORE: {{ .Values.backend.auth.sessionStore | quote }}
+  NAS_XML_PATH: {{ .Values.backend.nas.mountPath | quote }}
+  OIDC_ISSUER_URL: {{ .Values.backend.oidc.issuerUrl | quote }}
+  OIDC_CLIENT_ID: {{ .Values.backend.oidc.clientId | quote }}
+  OIDC_REDIRECT_URI: {{ .Values.backend.oidc.redirectUri | quote }}
+  OIDC_SCOPE: {{ .Values.backend.oidc.scope | quote }}
   DB_HOST: {{ include "propriateraydb.fullname" . }}-mariadb
   DB_PORT: {{ .Values.mariadb.service.port | quote }}
   DB_NAME: {{ .Values.mariadb.database | quote }}

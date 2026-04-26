@@ -19,6 +19,7 @@ services:
       AUTH_MODE: mock
       SESSION_STORE: redis
       SESSION_SECRET: local-development-secret
+      NAS_XML_PATH: /mnt/nas/xml
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: propriateraydb
@@ -32,6 +33,8 @@ services:
     depends_on:
       - db
       - redis
+    volumes:
+      - ./data/nas:/mnt/nas/xml:ro
     networks:
       default:
         aliases:

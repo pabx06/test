@@ -1,0 +1,4 @@
+registry=${NPM_REGISTRY_URL}
+//${NPM_REGISTRY_AUTH_PATH}:_authToken=${NPM_TOKEN}
+always-auth=true
+strict-ssl=true

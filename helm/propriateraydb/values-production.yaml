@@ -1,7 +1,7 @@
 frontend:
   replicas: 1
   image:
-    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/frontend
+    repository: harbor.example.com/propriateraydb/frontend
     digest: ""
     pullPolicy: IfNotPresent
   route:
@@ -10,11 +10,11 @@ frontend:
 backend:
   replicas: 1
   image:
-    repository: registry.gitlab.com/ton-groupe/propriateraydb-app/backend
+    repository: harbor.example.com/propriateraydb/backend
     digest: ""
     pullPolicy: IfNotPresent
   auth:
-    mode: saml
+    mode: oidc
     sessionStore: redis
   config:
     nodeEnv: production
