@@ -7,7 +7,22 @@ deploy:
   only:
     - main
   before_script:
-    - oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --insecure-skip-tls-verify="${OPENSHIFT_INSECURE_SKIP_TLS_VERIFY:-false}"
+    - |
+      set -eu
+      for var in FRONTEND_IMAGE_DIGEST BACKEND_IMAGE_DIGEST OPENSHIFT_SERVER OPENSHIFT_TOKEN OPENSHIFT_NAMESPACE OPENSHIFT_ROUTE_HOST; do
+        eval "value=\${$var:-}"
+        if [ -z "$value" ]; then
+          echo "$var is required" >&2
+          exit 1
+        fi
+      done
+    - |
+      if [ -n "${OPENSHIFT_CA_PEM:-}" ]; then
+        printf '%s\n' "$OPENSHIFT_CA_PEM" > openshift-ca.crt
+        oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --certificate-authority=openshift-ca.crt
+      else
+        oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --insecure-skip-tls-verify="${OPENSHIFT_INSECURE_SKIP_TLS_VERIFY:-false}"
+      fi
     - oc project "$OPENSHIFT_NAMESPACE" || oc new-project "$OPENSHIFT_NAMESPACE"
   script:
     - |

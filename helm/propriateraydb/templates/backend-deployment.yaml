@@ -14,7 +14,6 @@ spec:
     metadata:
       annotations:
         checksum/backend-config: {{ include (print $.Template.BasePath "/backend-configmap.yaml") . | sha256sum }}
-        checksum/backend-secret: {{ include (print $.Template.BasePath "/backend-secret.yaml") . | sha256sum }}
       labels:
         {{- include "propriateraydb.componentLabels" (dict "component" "backend" "Chart" .Chart "Release" .Release "Values" .Values) | nindent 8 }}
     spec:
@@ -30,13 +29,26 @@ spec:
             - configMapRef:
                 name: {{ include "propriateraydb.fullname" . }}-backend-config
             - secretRef:
-                name: {{ include "propriateraydb.fullname" . }}-backend-secrets
-          {{- if .Values.backend.nas.enabled }}
+                name: {{ include "propriateraydb.backendSecretName" . }}
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "propriateraydb.mariadbSecretName" . }}
+                  key: MYSQL_PASSWORD
+            {{ if eq .Values.backend.auth.sessionStore "redis" }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "propriateraydb.redisSecretName" . }}
+                  key: REDIS_PASSWORD
+            {{ end }}
+          {{ if .Values.backend.nas.enabled }}
           volumeMounts:
             - name: nas-xml
               mountPath: {{ .Values.backend.nas.mountPath | quote }}
               readOnly: {{ .Values.backend.nas.readOnly }}
-          {{- end }}
+          {{ end }}
           startupProbe:
             httpGet:
               path: {{ .Values.backend.probes.startup.path }}
@@ -61,9 +73,9 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
-      {{- if .Values.backend.nas.enabled }}
+      {{ if .Values.backend.nas.enabled }}
       volumes:
         - name: nas-xml
           persistentVolumeClaim:
             claimName: {{ required "backend.nas.existingClaim is required when backend.nas.enabled=true" .Values.backend.nas.existingClaim }}
-      {{- end }}
+      {{ end }}

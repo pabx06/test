@@ -26,25 +26,26 @@ smoke_backend_services:
       alias: db
     - name: redis:7-alpine
       alias: redis
+      command: ["redis-server", "--requirepass", "ci-redis-${CI_PIPELINE_ID}-${CI_JOB_ID}"]
   variables:
-    MYSQL_ROOT_PASSWORD: root
+    MYSQL_ROOT_PASSWORD: ci-root-${CI_PIPELINE_ID}-${CI_JOB_ID}
     MYSQL_DATABASE: propriateraydb
     MYSQL_USER: propriateraydb
-    MYSQL_PASSWORD: propriateraydb
+    MYSQL_PASSWORD: ci-db-${CI_PIPELINE_ID}-${CI_JOB_ID}
     NODE_ENV: test
     LOG_LEVEL: info
     PORT: "3000"
     AUTH_MODE: mock
     SESSION_STORE: redis
-    SESSION_SECRET: ci-smoke-session-secret
+    SESSION_SECRET: ci-smoke-session-${CI_PIPELINE_ID}-${CI_JOB_ID}-local-only
     DB_HOST: db
     DB_PORT: "3306"
     DB_NAME: propriateraydb
     DB_USER: propriateraydb
-    DB_PASSWORD: propriateraydb
+    DB_PASSWORD: ci-db-${CI_PIPELINE_ID}-${CI_JOB_ID}
     REDIS_HOST: redis
     REDIS_PORT: "6379"
-    REDIS_PASSWORD: ""
+    REDIS_PASSWORD: ci-redis-${CI_PIPELINE_ID}-${CI_JOB_ID}
   before_script:
     - |
       NPMRC_PATH="$HOME/.npmrc"

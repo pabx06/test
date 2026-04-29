@@ -23,9 +23,21 @@ spec:
           imagePullPolicy: {{ .Values.mariadb.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.mariadb.service.port }}
-          envFrom:
-            - secretRef:
-                name: {{ include "propriateraydb.fullname" . }}-mariadb-secrets
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mariadb.database | quote }}
+            - name: MYSQL_USER
+              value: {{ .Values.mariadb.username | quote }}
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "propriateraydb.mariadbSecretName" . }}
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "propriateraydb.mariadbSecretName" . }}
+                  key: MYSQL_PASSWORD
           resources:
             {{- toYaml .Values.mariadb.resources | nindent 12 }}
           volumeMounts:

@@ -221,12 +221,12 @@ Les emplacements suivants sont à prévoir :
 
 ```text
 feature/* branch
-  -> lint
+  -> lint + helm lint/template
   -> test
   -> quality sonarqube
 
 main branch
-  -> lint
+  -> lint + helm lint/template
   -> test
   -> quality sonarqube
   -> smoke backend avec services MariaDB/Redis
@@ -306,7 +306,7 @@ Cette liste sert à préparer l'environnement avant le premier déploiement. L'o
 | P0 | Harbor | Équipe registry / container platform | Projet Harbor, robot account push/pull, règles de rétention, scan d'images, mirroring images publiques | `HARBOR_REGISTRY`, `HARBOR_PROJECT`, `HARBOR_USERNAME`, `HARBOR_PASSWORD` |
 | P0 | Nexus npm | Équipe artifact repository | URL du repo npm group/proxy, token technique, CA entreprise, règles de publication si besoin | `NPM_REGISTRY_URL`, `NPM_REGISTRY_AUTH_PATH`, `NPM_TOKEN` |
 | P0 | OIDC / SSO | Équipe IAM / Active Directory | Création client OIDC confidentiel, redirect URI, scopes, claims groupes, utilisateurs de test | `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, mapping groupes/rôles |
-| P0 | Secrets | Équipe sécurité / plateforme | Mécanisme cible pour secrets OpenShift : Vault, ExternalSecret, SealedSecret ou injection CI | Stratégie validée pour remplacer les placeholders Helm `change-me` |
+| P0 | Secrets | Équipe sécurité / plateforme | Mécanisme cible pour secrets OpenShift : Vault, ExternalSecret, SealedSecret ou injection CI | Secrets applicatifs créés hors Helm avant déploiement |
 | P0 | DNS / FQDN | Équipe DNS / réseau | Nom public de l'application, zone DNS, routage vers OpenShift Apps | `OPENSHIFT_ROUTE_HOST` réservé et routable |
 | P0 | PKI TLS | Équipe PKI / cybersécurité | Processus CSR, CA utilisée, chaîne de certificats, durée, renouvellement | Certificat signé ou confirmation d'un wildcard/ingress cert géré plateforme |
 | P1 | NAS Samba | Équipe stockage / plateforme | Partage SMB, mode lecture/écriture, compte technique si requis, montage OpenShift via PV/PVC | `backend.nas.existingClaim`, `NAS_XML_PATH`, test de lecture fichier |
@@ -367,6 +367,7 @@ Les variables dérivées suivantes existent déjà dans `.gitlab-ci.yml` et ne s
 | `OPENSHIFT_TOKEN` | Oui pour deploy | Masquée, protégée | token service account OpenShift | `deploy` |
 | `OPENSHIFT_ROUTE_HOST` | Oui pour deploy | Non masquée, protégée | `propriateraydb.apps.ocp.example.com` | `deploy`, Helm Route |
 | `OPENSHIFT_INSECURE_SKIP_TLS_VERIFY` | Optionnelle | Non masquée | `false` | `deploy` |
+| `OPENSHIFT_CA_PEM` | Optionnelle | Non masquée, protégée | certificat CA PEM | `deploy` |
 
 ### Variables applicatives à injecter par Helm ou secret manager
 
@@ -376,13 +377,13 @@ Ces valeurs ne sont pas toutes consommées directement par `.gitlab-ci.yml` aujo
 | --- | --- | --- | --- | --- |
 | `backend.oidc.issuerUrl` / `OIDC_ISSUER_URL` | Oui en OIDC | Non | `https://idp.example.com/realms/propriateraydb` | Découverte OIDC |
 | `backend.oidc.clientId` / `OIDC_CLIENT_ID` | Oui en OIDC | Non | `propriateraydb-backend` | Client OIDC |
-| `backend.secrets.oidcClientSecret` / `OIDC_CLIENT_SECRET` | Oui en OIDC | Oui | secret client | Backend auth |
+| `backend.secret.existingName` / `OIDC_CLIENT_SECRET` | Oui en OIDC | Oui | secret client | Backend auth |
 | `backend.oidc.redirectUri` / `OIDC_REDIRECT_URI` | Oui en OIDC | Non | `https://propriateraydb.example.com/auth/callback` | Callback OIDC |
 | `backend.oidc.scope` / `OIDC_SCOPE` | Oui en OIDC | Non | `openid profile email` | Scopes OIDC |
-| `backend.secrets.sessionSecret` / `SESSION_SECRET` | Oui | Oui | secret long aléatoire | Signature session |
-| `mariadb.password` / `DB_PASSWORD` | Oui | Oui | mot de passe app DB | Backend vers MariaDB |
-| `mariadb.rootPassword` | Oui si MariaDB embarquée | Oui | mot de passe root DB | Init MariaDB |
-| `redis.password` / `REDIS_PASSWORD` | Optionnelle | Oui si définie | mot de passe Redis | Sessions Redis |
+| `backend.secret.existingName` / `SESSION_SECRET` | Oui | Oui | secret long aléatoire | Signature session |
+| `mariadb.secret.existingName` / `MYSQL_PASSWORD` / `DB_PASSWORD` | Oui | Oui | mot de passe app DB | Backend vers MariaDB |
+| `mariadb.secret.existingName` / `MYSQL_ROOT_PASSWORD` | Oui si MariaDB embarquée | Oui | mot de passe root DB | Init MariaDB |
+| `redis.secret.existingName` / `REDIS_PASSWORD` | Oui si Redis activé | Oui | mot de passe Redis | Sessions Redis |
 | `backend.nas.existingClaim` | Oui si NAS activé | Non | `propriateraydb-nas-pvc` | Montage NAS OpenShift |
 | `backend.nas.mountPath` / `NAS_XML_PATH` | Oui si NAS activé | Non | `/mnt/nas/xml` | Lecture fichiers NAS |
 
@@ -568,13 +569,10 @@ propriateraydb-app/
 │           ├── backend-deployment.yaml
 │           ├── backend-service.yaml
 │           ├── backend-configmap.yaml
-│           ├── backend-secret.yaml
 │           ├── mariadb-statefulset.yaml
 │           ├── mariadb-service.yaml
-│           ├── mariadb-secret.yaml
 │           ├── redis-statefulset.yaml
 │           ├── redis-service.yaml
-│           ├── redis-secret.yaml
 │           ├── networkpolicy.yaml
 │           └── serviceaccount.yaml
 │
@@ -635,6 +633,13 @@ backend (Express + TypeScript + client confidentiel OIDC)
 - Pour les tests d'intégration SSO, prévoir un `IdP` de test ou un environnement client dédié.
 - Les logs `frontend`, `backend`, `nginx`, `MariaDB` et `Redis` doivent être lisibles via `docker compose logs`.
 
+### Secrets locaux
+
+- Copier `.env.example` vers `.env` pour le developpement local.
+- `.env` est ignore par Git et ne doit jamais contenir de valeurs reutilisables en production.
+- `docker-compose.yml` lit les secrets via interpolation `${...}` et echoue au demarrage si une valeur obligatoire manque.
+- Le backend reste portable : il lit uniquement `process.env`, que les variables viennent de Docker Compose ou d'OpenShift.
+
 ### Exemple de `docker-compose.yml`
 
 ```yaml
@@ -654,14 +659,16 @@ services:
       NODE_ENV: development
       AUTH_MODE: mock
       SESSION_STORE: redis
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
       NAS_XML_PATH: /mnt/nas/xml
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: propriateraydb
       DB_USER: propriateraydb
-      DB_PASSWORD: propriateraydb
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       ITK_MOCK: "true"
       PROPRIATERAYDB_MOCK: "true"
     depends_on:
@@ -673,18 +680,20 @@ services:
   db:
     image: mariadb:10.11
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
       MYSQL_DATABASE: propriateraydb
       MYSQL_USER: propriateraydb
-      MYSQL_PASSWORD: propriateraydb
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - db_data:/var/lib/mysql
       - ./docker/mariadb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    command: ["sh", "-c", "redis-server /usr/local/etc/redis/redis.conf --requirepass \"$${REDIS_PASSWORD}\""]
     profiles: ["session-store"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - redis_data:/data
@@ -743,6 +752,45 @@ backend Deployment
 - Le backend doit être surveillé par probes et redémarré automatiquement par le `Deployment`.
 - Les logs de chaque pod doivent être disponibles via `oc logs`, avec branchement sur la solution de centralisation du client si elle existe.
 
+### Secrets OpenShift hors Helm
+
+Les pods OpenShift n'ont pas besoin d'un fichier `.env`. Le chart reference des `Secret` deja presents dans le namespace, et Kubernetes injecte les variables dans les containers.
+
+Avec le release Helm par defaut `propriateraydb`, creer ou mettre a jour les secrets hors Helm avec `oc` :
+
+```sh
+oc new-project propriateraydb || oc project propriateraydb
+
+SESSION_SECRET="$(openssl rand -base64 48)"
+OIDC_CLIENT_SECRET="$(openssl rand -base64 32)"
+DB_PASSWORD="$(openssl rand -base64 32)"
+MYSQL_ROOT_PASSWORD="$(openssl rand -base64 32)"
+REDIS_PASSWORD="$(openssl rand -base64 32)"
+
+oc create secret generic propriateraydb-backend-secrets \
+  --from-literal=SESSION_SECRET="${SESSION_SECRET}" \
+  --from-literal=OIDC_CLIENT_SECRET="${OIDC_CLIENT_SECRET}" \
+  --dry-run=client -o yaml | oc apply -f -
+
+oc create secret generic propriateraydb-mariadb-secrets \
+  --from-literal=MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}" \
+  --from-literal=MYSQL_PASSWORD="${DB_PASSWORD}" \
+  --dry-run=client -o yaml | oc apply -f -
+
+oc create secret generic propriateraydb-redis-secrets \
+  --from-literal=REDIS_PASSWORD="${REDIS_PASSWORD}" \
+  --dry-run=client -o yaml | oc apply -f -
+```
+
+Apres une mise a jour de secret, redemarrer les workloads concernes :
+
+```sh
+oc rollout restart deploy/propriateraydb-backend
+oc rollout restart statefulset/propriateraydb-redis
+```
+
+La rotation du mot de passe MariaDB demande aussi de modifier l'utilisateur dans la base de donnees. Mettre a jour uniquement le `Secret` Kubernetes et redemarrer le `StatefulSet` ne suffit pas pour une rotation complete.
+
 ### Ce qu'un déploiement backend complet doit contenir
 
 ```yaml
@@ -770,6 +818,17 @@ spec:
                 name: propriateraydb-backend-config
             - secretRef:
                 name: propriateraydb-backend-secrets
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: propriateraydb-mariadb-secrets
+                  key: MYSQL_PASSWORD
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: propriateraydb-redis-secrets
+                  key: REDIS_PASSWORD
           startupProbe:
             httpGet:
               path: /health/startup
@@ -820,9 +879,21 @@ spec:
           image: mariadb:10.11
           ports:
             - containerPort: 3306
-          envFrom:
-            - secretRef:
-                name: propriateraydb-mariadb-secrets
+          env:
+            - name: MYSQL_DATABASE
+              value: propriateraydb
+            - name: MYSQL_USER
+              value: propriateraydb
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: propriateraydb-mariadb-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: propriateraydb-mariadb-secrets
+                  key: MYSQL_PASSWORD
           volumeMounts:
             - name: mariadb-data
               mountPath: /var/lib/mysql
@@ -841,13 +912,14 @@ spec:
 Deux options raisonnables :
 
 - `disabled` si on accepte de perdre les sessions au redémarrage
-- `enabled` si `backend.sessionStore=redis` ou si la session doit survivre au crash backend
+- `enabled` si `backend.auth.sessionStore=redis` ou si la session doit survivre au crash backend
 
 Si activé :
 
 - `1 replica` suffit
 - `Service` interne uniquement
 - persistance facultative selon usage
+- `REDIS_PASSWORD` vient du `Secret` OpenShift et Redis demarre avec `requirepass`
 - pas de HA nécessaire au départ
 
 ## Runbook incident OpenShift
@@ -988,6 +1060,8 @@ backend:
   auth:
     mode: oidc
     sessionStore: redis
+  secret:
+    existingName: propriateraydb-backend-secrets
   oidc:
     issuerUrl: https://idp.example.com/realms/propriateraydb
     clientId: propriateraydb-backend
@@ -1001,10 +1075,15 @@ backend:
 
 mariadb:
   enabled: true
-  size: 10Gi
+  secret:
+    existingName: propriateraydb-mariadb-secrets
+  persistence:
+    storage: 10Gi
 
 redis:
   enabled: true
+  secret:
+    existingName: propriateraydb-redis-secrets
 ```
 
 ### Règle de scaling
@@ -1019,6 +1098,8 @@ redis:
 
 - Le pipeline principal doit être à la racine : `.gitlab-ci.yml`
 - Les jobs factorisés restent dans `.gitlab/ci/`
+
+- Le job `helm_lint` valide le chart avec `helm lint` et `helm template` pour `values.yaml`, `values-recette.yaml` et `values-production.yaml`.
 
 ### Exemple de `.gitlab-ci.yml`
 
@@ -1057,10 +1138,28 @@ variables:
 deploy:
   stage: deploy
   image: $CI_TOOLS_IMAGE
+  needs:
+    - job: build
+      artifacts: true
   only:
     - main
   before_script:
-    - oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN"
+    - |
+      set -eu
+      for var in FRONTEND_IMAGE_DIGEST BACKEND_IMAGE_DIGEST OPENSHIFT_SERVER OPENSHIFT_TOKEN OPENSHIFT_NAMESPACE OPENSHIFT_ROUTE_HOST; do
+        eval "value=\${$var:-}"
+        if [ -z "$value" ]; then
+          echo "$var is required" >&2
+          exit 1
+        fi
+      done
+    - |
+      if [ -n "${OPENSHIFT_CA_PEM:-}" ]; then
+        printf '%s\n' "$OPENSHIFT_CA_PEM" > openshift-ca.crt
+        oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --certificate-authority=openshift-ca.crt
+      else
+        oc login "$OPENSHIFT_SERVER" --token="$OPENSHIFT_TOKEN" --insecure-skip-tls-verify="${OPENSHIFT_INSECURE_SKIP_TLS_VERIFY:-false}"
+      fi
     - oc project "$OPENSHIFT_NAMESPACE" || oc new-project "$OPENSHIFT_NAMESPACE"
   script:
     - helm upgrade --install propriateraydb ./helm/propriateraydb \
@@ -1069,9 +1168,11 @@ deploy:
         --set frontend.image.repository="$IMAGE_FRONTEND" \
         --set backend.image.repository="$IMAGE_BACKEND" \
         --set-string frontend.route.host="$OPENSHIFT_ROUTE_HOST" \
-        --set frontend.image.digest=$FRONTEND_IMAGE_DIGEST \
-        --set backend.image.digest=$BACKEND_IMAGE_DIGEST
+        --set frontend.image.digest="${FRONTEND_IMAGE_DIGEST}" \
+        --set backend.image.digest="${BACKEND_IMAGE_DIGEST}"
 ```
+
+Si le cluster utilise une autorite de certification privee, fournir `OPENSHIFT_CA_PEM` comme variable CI protegee. Le job de deploiement l'ecrit dans `openshift-ca.crt` et l'utilise pour `oc login`.
 
 ## Résumé de la cible
 

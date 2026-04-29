@@ -18,16 +18,16 @@ services:
       LOG_LEVEL: debug
       AUTH_MODE: mock
       SESSION_STORE: redis
-      SESSION_SECRET: local-development-secret
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
       NAS_XML_PATH: /mnt/nas/xml
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: propriateraydb
       DB_USER: propriateraydb
-      DB_PASSWORD: propriateraydb
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ""
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       ITK_MOCK: "true"
       PROPRIATERAYDB_MOCK: "true"
     depends_on:
@@ -43,17 +43,19 @@ services:
   db:
     image: mariadb:10.11
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
       MYSQL_DATABASE: propriateraydb
       MYSQL_USER: propriateraydb
-      MYSQL_PASSWORD: propriateraydb
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - db_data:/var/lib/mysql
       - ./docker/mariadb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    command: ["sh", "-c", "redis-server /usr/local/etc/redis/redis.conf --requirepass \"$${REDIS_PASSWORD}\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - redis_data:/data

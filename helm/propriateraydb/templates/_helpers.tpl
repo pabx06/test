@@ -41,6 +41,18 @@ app.kubernetes.io/component: {{ .component }}
 {{- end -}}
 {{- end -}}
 
+{{- define "propriateraydb.backendSecretName" -}}
+{{- default (printf "%s-backend-secrets" (include "propriateraydb.fullname" .)) .Values.backend.secret.existingName -}}
+{{- end -}}
+
+{{- define "propriateraydb.mariadbSecretName" -}}
+{{- default (printf "%s-mariadb-secrets" (include "propriateraydb.fullname" .)) .Values.mariadb.secret.existingName -}}
+{{- end -}}
+
+{{- define "propriateraydb.redisSecretName" -}}
+{{- default (printf "%s-redis-secrets" (include "propriateraydb.fullname" .)) .Values.redis.secret.existingName -}}
+{{- end -}}
+
 {{- define "propriateraydb.frontendImage" -}}
 {{- if .Values.frontend.image.digest -}}
 {{- printf "%s@%s" .Values.frontend.image.repository .Values.frontend.image.digest -}}

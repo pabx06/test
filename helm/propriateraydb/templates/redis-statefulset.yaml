@@ -21,8 +21,17 @@ spec:
         - name: redis
           image: {{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}
           imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          args:
+            - "--requirepass"
+            - "$(REDIS_PASSWORD)"
           ports:
             - containerPort: {{ .Values.redis.service.port }}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "propriateraydb.redisSecretName" . }}
+                  key: REDIS_PASSWORD
           resources:
             {{- toYaml .Values.redis.resources | nindent 12 }}
           {{- if .Values.redis.persistence.enabled }}

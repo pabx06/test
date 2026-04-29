@@ -12,13 +12,13 @@ const envSchema = z
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
     AUTH_MODE: z.enum(["mock", "oidc"]).default("mock"),
     SESSION_STORE: z.enum(["memory", "redis"]).default("memory"),
-    SESSION_SECRET: z.string().min(8).default("local-development-secret"),
+    SESSION_SECRET: z.string().min(32),
     NAS_XML_PATH: z.string().min(1).default("/mnt/nas/xml"),
     DB_HOST: z.string().min(1).default("db"),
     DB_PORT: z.coerce.number().int().positive().default(3306),
     DB_NAME: z.string().min(1).default("propriateraydb"),
     DB_USER: z.string().min(1).default("propriateraydb"),
-    DB_PASSWORD: z.string().min(1).default("propriateraydb"),
+    DB_PASSWORD: z.string().min(1),
     REDIS_HOST: z.string().optional().default("redis"),
     REDIS_PORT: z.coerce.number().int().positive().default(6379),
     REDIS_PASSWORD: z.string().optional().default(""),
@@ -53,6 +53,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["REDIS_HOST"],
         message: "REDIS_HOST is required when SESSION_STORE=redis"
+      });
+    }
+
+    if (data.SESSION_STORE === "redis" && !data.REDIS_PASSWORD) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["REDIS_PASSWORD"],
+        message: "REDIS_PASSWORD is required when SESSION_STORE=redis"
       });
     }
   });

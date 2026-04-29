@@ -11,3 +11,14 @@ lint:
     - test -f .gitlab-ci.yml
     - test -f backend/src/config/logger.ts
     - test -f helm/propriateraydb/Chart.yaml
+
+helm_lint:
+  stage: lint
+  image: $CI_TOOLS_IMAGE
+  script:
+    - helm lint helm/propriateraydb
+    - helm lint helm/propriateraydb -f helm/propriateraydb/values-recette.yaml
+    - helm lint helm/propriateraydb -f helm/propriateraydb/values-production.yaml
+    - helm template propriateraydb helm/propriateraydb >/tmp/propriateraydb-default.yaml
+    - helm template propriateraydb helm/propriateraydb -f helm/propriateraydb/values-recette.yaml >/tmp/propriateraydb-recette.yaml
+    - helm template propriateraydb helm/propriateraydb -f helm/propriateraydb/values-production.yaml >/tmp/propriateraydb-production.yaml
