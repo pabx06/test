@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-azuretools.vscode-docker",
+    "redhat.vscode-yaml",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "redhat.vscode-openshift-connector",
+    "GitLab.gitlab-workflow",
+    "SonarSource.sonarlint-vscode",
+    "timonwong.shellcheck",
+    "ahmadalli.vscode-nginx-conf",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-mysql"
+  ]
+}
