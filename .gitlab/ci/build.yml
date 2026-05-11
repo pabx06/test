@@ -1,17 +1,16 @@
 build:
   stage: build
   image:
-    name: $KANIKO_IMAGE
+    name: $BUILDAH_IMAGE
     entrypoint: [""]
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_FORMAT: docker
+    BUILDAH_ISOLATION: chroot
   only:
     - main
   before_script:
-    - mkdir -p /kaniko/.docker
-    - |
-      HARBOR_AUTH="$(printf "%s:%s" "$HARBOR_USERNAME" "$HARBOR_PASSWORD" | base64 | tr -d '\n')"
-      cat > /kaniko/.docker/config.json <<EOF
-      {"auths":{"${HARBOR_REGISTRY}":{"auth":"${HARBOR_AUTH}"}}}
-      EOF
+    - printf "%s" "$HARBOR_PASSWORD" | buildah login --username "$HARBOR_USERNAME" --password-stdin "$HARBOR_REGISTRY"
     - |
       NPMRC_PATH="${CI_PROJECT_DIR}/backend/.npmrc.example"
       : > "$NPMRC_PATH"
@@ -26,8 +25,10 @@ build:
         printf "registry=https://registry.npmjs.org/\nstrict-ssl=true\n" > "$NPMRC_PATH"
       fi
   script:
-    - /kaniko/executor --context "${CI_PROJECT_DIR}/frontend" --dockerfile "${CI_PROJECT_DIR}/frontend/Dockerfile" --destination "${IMAGE_FRONTEND}:${CI_COMMIT_SHORT_SHA}" --digest-file frontend.digest --cache=false
-    - /kaniko/executor --context "${CI_PROJECT_DIR}/backend" --dockerfile "${CI_PROJECT_DIR}/backend/Dockerfile" --destination "${IMAGE_BACKEND}:${CI_COMMIT_SHORT_SHA}" --digest-file backend.digest --cache=false
+    - buildah bud --layers=false --file "${CI_PROJECT_DIR}/frontend/Dockerfile" --tag "${IMAGE_FRONTEND}:${CI_COMMIT_SHORT_SHA}" "${CI_PROJECT_DIR}/frontend"
+    - buildah push --digestfile frontend.digest "${IMAGE_FRONTEND}:${CI_COMMIT_SHORT_SHA}" "docker://${IMAGE_FRONTEND}:${CI_COMMIT_SHORT_SHA}"
+    - buildah bud --layers=false --file "${CI_PROJECT_DIR}/backend/Dockerfile" --tag "${IMAGE_BACKEND}:${CI_COMMIT_SHORT_SHA}" "${CI_PROJECT_DIR}/backend"
+    - buildah push --digestfile backend.digest "${IMAGE_BACKEND}:${CI_COMMIT_SHORT_SHA}" "docker://${IMAGE_BACKEND}:${CI_COMMIT_SHORT_SHA}"
     - FRONTEND_IMAGE_DIGEST="$(cat frontend.digest)"
     - BACKEND_IMAGE_DIGEST="$(cat backend.digest)"
     - printf "FRONTEND_IMAGE_DIGEST=%s\nBACKEND_IMAGE_DIGEST=%s\n" "$FRONTEND_IMAGE_DIGEST" "$BACKEND_IMAGE_DIGEST" > build.env

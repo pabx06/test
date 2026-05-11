@@ -246,7 +246,7 @@ main branch
 - Ne pas modifier les manifests avec `sed`.
 - Le chart `Helm` reçoit les digests via `--set`.
 - La quality gate `SonarQube` bloque le pipeline avant le smoke, le build image et le déploiement.
-- Le pipeline GitLab par défaut ne nécessite pas de runner privilégié : les images sont construites avec `kaniko`, et le smoke CI utilise des services GitLab `MariaDB`/`Redis` au lieu de `Docker-in-Docker`.
+- Le pipeline GitLab par défaut ne nécessite pas de Docker daemon : les images sont construites avec `buildah`, et le smoke CI utilise des services GitLab `MariaDB`/`Redis` au lieu de `Docker-in-Docker`.
 - Le smoke Docker Compose reste un test local ou un test à lancer sur runner dédié disposant déjà d'un moteur Docker. Un vrai `docker compose up` en CI nécessite forcément un moteur Docker, via runner privilégié, socket hôte ou runtime équivalent.
 
 ## Inventaire des images Docker
@@ -280,7 +280,7 @@ Cet inventaire liste les images référencées directement par le dépôt. En en
 
 | Image | Usage | Source de configuration |
 | --- | --- | --- |
-| `gcr.io/kaniko-project/executor:v1.23.2-debug` | Build et push des images applicatives sans Docker daemon privilégié | `KANIKO_IMAGE`, `.gitlab/ci/build.yml` |
+| `quay.io/buildah/stable:v1.43.1` | Build et push des images applicatives sans Docker daemon | `BUILDAH_IMAGE`, `.gitlab/ci/build.yml` |
 | `sonarsource/sonar-scanner-cli:5.0.1` | Analyse SonarQube et attente de quality gate | `SONAR_SCANNER_IMAGE`, `.gitlab/ci/quality.yml` |
 | `$CI_TOOLS_IMAGE` | Jobs `lint`, `test`, `smoke_backend_services` et `deploy` | `.gitlab/ci/*.yml` |
 
@@ -288,7 +288,7 @@ Cet inventaire liste les images référencées directement par le dépôt. En en
 
 - Les images applicatives doivent être poussées dans `Harbor` avec le tag `:$CI_COMMIT_SHORT_SHA`.
 - Le déploiement OpenShift doit utiliser les digests produits par la CI, pas `latest`.
-- Les images publiques `node`, `nginx`, `mariadb`, `redis`, `kaniko`, `sonar-scanner-cli` et `ubi` doivent être validées par l'entreprise et idéalement mirrorées dans `Harbor`.
+- Les images publiques `node`, `nginx`, `mariadb`, `redis`, `buildah`, `sonar-scanner-cli` et `ubi` doivent être validées par l'entreprise et idéalement mirrorées dans `Harbor`.
 - Les valeurs Helm `repository` et `tag` restent paramétrables pour remplacer les images publiques par des miroirs internes.
 
 ## Configuration enterprise
@@ -313,7 +313,7 @@ Cette liste sert à préparer l'environnement avant le premier déploiement. L'o
 | P1 | Réseau / firewall | Équipe réseau / sécurité | Flux sortants backend vers IdP OIDC, API ITK, DNS, NAS si applicable, accès Harbor/Nexus/Sonar depuis runners | Matrice de flux validée et règles firewall ouvertes |
 | P1 | SonarQube | Équipe qualité / DevSecOps | Projet SonarQube, quality gate, token technique, image scanner mirrorée si requis | `SONAR_HOST_URL`, `SONAR_PROJECT_KEY`, `SONAR_TOKEN` |
 | P1 | GitLab | Équipe GitLab / DevOps | Variables masquées/protégées, runners non privilégiés, protection branches/tags, règles merge request | Variables CI créées, pipeline MR et `main` validés |
-| P1 | Images de base | Équipe sécurité container | Validation ou mirroring de `node`, `nginx`, `mariadb`, `redis`, `kaniko`, `sonar-scanner-cli`, `ubi` | Liste d'images internes Harbor ou exceptions validées |
+| P1 | Images de base | Équipe sécurité container | Validation ou mirroring de `node`, `nginx`, `mariadb`, `redis`, `buildah`, `sonar-scanner-cli`, `ubi` | Liste d'images internes Harbor ou exceptions validées |
 | P1 | Observabilité | Équipe exploitation | Stack logs, rétention, dashboards, alerting, accès `oc logs` | Process de consultation logs et alertes de base |
 | P1 | Base de données | DBA / équipe plateforme | Politique MariaDB embarquée vs service managé, backup/restore, stockage, mot de passe root/app | Stratégie DB validée et test restauration prévu |
 | P2 | Poste de dev | Équipe poste / sécurité | Accès Docker ou Podman, proxy entreprise, CA racine, accès Nexus/Harbor/OpenShift | Conteneur dev UBI buildable et utilisable |
@@ -323,7 +323,7 @@ Cette liste sert à préparer l'environnement avant le premier déploiement. L'o
 1. Valider les contacts et propriétaires pour `OpenShift`, `Harbor`, `Nexus`, `OIDC`, `PKI`, `GitLab`.
 2. Créer les projets techniques : namespace OpenShift, projet Harbor, projet SonarQube, client OIDC.
 3. Créer les comptes techniques et variables GitLab masquées/protégées.
-4. Valider le build CI sans runner privilégié avec `kaniko`.
+4. Valider le build CI sans Docker daemon avec `buildah`.
 5. Valider le smoke backend avec services GitLab `MariaDB` et `Redis`.
 6. Valider le chart Helm en recette avec images par digest.
 7. Valider la Route frontend, le certificat TLS, les flux `/api/*` et `/auth/*`.
@@ -353,7 +353,7 @@ Les variables dérivées suivantes existent déjà dans `.gitlab-ci.yml` et ne s
 | `HARBOR_PROJECT` | Oui | Non masquée, protégée | `propriateraydb` | Tous les jobs, build images |
 | `HARBOR_USERNAME` | Oui | Masquée, protégée | `robot$propriateraydb+ci` | `build` |
 | `HARBOR_PASSWORD` | Oui | Masquée, protégée | mot de passe robot Harbor | `build` |
-| `KANIKO_IMAGE` | Oui si image mirrorée | Non masquée, protégée | `harbor.example.com/tools/kaniko:v1.23.2-debug` | `build` |
+| `BUILDAH_IMAGE` | Oui si image mirrorée | Non masquée, protégée | `harbor.example.com/tools/buildah:v1.43.1` | `build` |
 | `SONAR_SCANNER_IMAGE` | Oui si image mirrorée | Non masquée, protégée | `harbor.example.com/tools/sonar-scanner-cli:5.0.1` | `sonarqube` |
 | `NPM_REGISTRY_URL` | Oui en entreprise | Non masquée, protégée | `https://nexus.example.com/repository/npm-group/` | `test`, `smoke_backend_services`, `build` |
 | `NPM_REGISTRY_AUTH_PATH` | Oui si Nexus requiert auth | Non masquée, protégée | `nexus.example.com/repository/npm-group/` | `test`, `smoke_backend_services`, `build` |
@@ -424,7 +424,7 @@ cp .npmrc.example .npmrc
 npm ci --prefix backend
 ```
 
-En CI, le fichier `backend/.npmrc.example` est remplacé temporairement à partir des variables GitLab avant le build `kaniko`. Ce fichier est utilisé uniquement dans les stages intermédiaires du `backend/Dockerfile`, puis supprimé avant la copie vers l'image finale. Le cache `kaniko` reste désactivé pour éviter de publier une couche intermédiaire contenant la configuration npm.
+En CI, le fichier `backend/.npmrc.example` est remplacé temporairement à partir des variables GitLab avant le build `buildah`. Ce fichier est utilisé uniquement dans les stages intermédiaires du `backend/Dockerfile`, puis supprimé avant la copie vers l'image finale. Le build `buildah` utilise `--layers=false` pour éviter de publier une couche intermédiaire contenant la configuration npm.
 
 ### SonarQube
 
@@ -1126,7 +1126,7 @@ variables:
   IMAGE_FRONTEND: $REGISTRY/frontend
   IMAGE_BACKEND: $REGISTRY/backend
   CI_TOOLS_IMAGE: $REGISTRY/ci-tools:ubi9
-  KANIKO_IMAGE: gcr.io/kaniko-project/executor:v1.23.2-debug
+  BUILDAH_IMAGE: quay.io/buildah/stable:v1.43.1
   SONAR_SCANNER_IMAGE: sonarsource/sonar-scanner-cli:5.0.1
   OPENSHIFT_SERVER: https://api.ocp.example.com:6443
   OPENSHIFT_NAMESPACE: propriateraydb

@@ -20,6 +20,6 @@ variables:
   IMAGE_FRONTEND: $REGISTRY/frontend
   IMAGE_BACKEND: $REGISTRY/backend
   CI_TOOLS_IMAGE: $REGISTRY/ci-tools:ubi9
-  KANIKO_IMAGE: gcr.io/kaniko-project/executor:v1.23.2-debug
+  BUILDAH_IMAGE: quay.io/buildah/stable:v1.43.1
   SONAR_SCANNER_IMAGE: sonarsource/sonar-scanner-cli:5.0.1
   OPENSHIFT_NAMESPACE: propriateraydb

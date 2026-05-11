@@ -4,7 +4,7 @@ Best way: bring a **one-page deployment sketch + a requirements checklist** for 
 GitLab CI
   |
   | pulls CI/tool/base images from Harbor cache
-  | builds frontend/backend with Kaniko
+  | builds frontend/backend with Buildah
   | pushes app images to Harbor app project
   v
 Harbor
@@ -60,7 +60,7 @@ Deploy `propriateraydb` through GitLab CI/CD into OpenShift using Helm, without 
      - Nginx
      - MariaDB
      - Redis
-     - Kaniko
+     - Buildah
      - Sonar scanner
      - UBI base image
    - Required pull secret in OpenShift, for example:
@@ -158,7 +158,7 @@ flowchart TB
   test[backend build/test\nnpm ci + npm run build]
   quality[quality\nSonarQube scan]
   smoke[smoke_backend_services\nbackend + MariaDB + Redis]
-  build[build\nKaniko frontend/backend]
+  build[build\nBuildah frontend/backend]
   deploy[deploy\noc login + helm upgrade]
 
   cacheHarbor[Harbor cache / mirror\nthird-party base and tool images]
@@ -197,4 +197,3 @@ flowchart TB
 Ask them clearly:
 
 > “Do you want GitLab CI to only deploy Helm resources, while OpenShift/platform owns Secrets, image pull credentials, namespaces, storage, and route/TLS?”
-
