@@ -6,6 +6,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "provider": "mock-oidc-provider --port ${OIDC_PROVIDER_PORT:-8092} --users ./mock-users.yaml",
+    "smoke:oidc": "bash scripts/smoke-oidc.sh",
     "start": "node dist/server.js",
     "test": "node -e \"console.log('test scaffold placeholder')\""
   },
@@ -14,12 +16,14 @@
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "mysql2": "^3.12.0",
+    "openid-client": "^6.8.4",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
     "redis": "^4.7.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@bluecateng/mock-oidc-provider": "^0.3.4",
     "@types/express": "^5.0.1",
     "@types/express-session": "^1.18.1",
     "@types/node": "^22.10.5",

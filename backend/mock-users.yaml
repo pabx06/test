@@ -1,0 +1,12 @@
+- sub: alice
+  email: alice@example.test
+  idClaims:
+    name: Alice Demo
+  accessClaims:
+    role: admin
+- sub: bob
+  email: bob@example.test
+  idClaims:
+    name: Bob Demo
+  accessClaims:
+    role: viewer

@@ -5,6 +5,19 @@ const booleanString = z
   .optional()
   .transform((value) => value === "true");
 
+const isAllowedOidcIssuerUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:") {
+      return true;
+    }
+
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
+  } catch {
+    return true;
+  }
+};
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().int().positive().default(3000),
@@ -44,6 +57,14 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           path: [field],
           message: `${field} is required when AUTH_MODE=oidc`
+        });
+      }
+
+      if (data.OIDC_ISSUER_URL && !isAllowedOidcIssuerUrl(data.OIDC_ISSUER_URL)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["OIDC_ISSUER_URL"],
+          message: "OIDC_ISSUER_URL must use HTTPS unless it points to localhost"
         });
       }
     }

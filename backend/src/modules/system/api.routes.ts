@@ -10,6 +10,6 @@ apiRouter.get("/status", (request, response) => {
     nodeEnv: env.NODE_ENV,
     authMode: env.AUTH_MODE,
     sessionStore: env.SESSION_STORE,
-    authenticated: Boolean(request.session.user)
+    authenticated: Boolean(request.session.authContext)
   });
 });

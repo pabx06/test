@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from "express";
 import { ZodError } from "zod";
 
 import { logger } from "../config/logger";
+import { HttpError } from "./http-error";
 
 export const notFoundHandler: RequestHandler = (request, response) => {
   response.status(404).json({
@@ -15,6 +16,15 @@ export const errorHandler: ErrorRequestHandler = (error, request, response, _nex
     response.status(400).json({
       error: "validation_error",
       details: error.flatten()
+    });
+    return;
+  }
+
+  if (error instanceof HttpError) {
+    response.status(error.statusCode).json({
+      error: error.errorCode,
+      message: error.message,
+      ...(error.details ? { details: error.details } : {})
     });
     return;
   }
