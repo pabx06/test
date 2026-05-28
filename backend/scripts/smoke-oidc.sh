@@ -59,7 +59,7 @@ provider_pid="$!"
 wait_for "$PROVIDER_URL/.well-known/openid-configuration" "mock OIDC provider" "$provider_pid"
 
 NODE_ENV=test \
-LOG_LEVEL=info \
+LOG_LEVEL="${OIDC_SMOKE_LOG_LEVEL:-info}" \
 PORT="$(port_of "$BACKEND_URL")" \
 AUTH_MODE=oidc \
 SESSION_STORE=memory \

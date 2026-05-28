@@ -11,11 +11,28 @@ import {
 
 type OpenIdClientModule = typeof import("openid-client");
 type OidcConfiguration = import("openid-client").Configuration;
+type OidcCustomFetch = import("openid-client").CustomFetch;
+type OidcDiscoveryRequestOptions = import("openid-client").DiscoveryRequestOptions;
 type ClaimBag = Record<string, unknown>;
 
 const nativeImport = new Function("specifier", "return import(specifier)") as (
   specifier: string
 ) => Promise<OpenIdClientModule>;
+
+const redactedKeys = new Set([
+  "access_token",
+  "authorization",
+  "client_assertion",
+  "client_secret",
+  "code",
+  "code_verifier",
+  "cookie",
+  "id_token",
+  "password",
+  "refresh_token",
+  "set-cookie"
+]);
+const maxLoggedBodyLength = 4000;
 
 let openIdClientModule: OpenIdClientModule | null = null;
 let oidcConfiguration: OidcConfiguration | null = null;
@@ -32,6 +49,118 @@ const isLocalHttpIssuer = (issuerUrl: URL) =>
   issuerUrl.protocol === "http:" &&
   ["localhost", "127.0.0.1", "::1", "[::1]"].includes(issuerUrl.hostname);
 
+const redactValue = (key: string, value: unknown): unknown => {
+  if (redactedKeys.has(key.toLowerCase())) {
+    return "[redacted]";
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactValue(key, entry));
+  }
+
+  if (value && typeof value === "object") {
+    return redactRecord(value as Record<string, unknown>);
+  }
+
+  return value;
+};
+
+const redactRecord = (record: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(record).map(([key, value]) => [key, redactValue(key, value)]));
+
+const parseBodyText = (body: string, contentType?: string) => {
+  if (body.length === 0) {
+    return undefined;
+  }
+
+  if (contentType?.includes("application/json")) {
+    try {
+      return redactValue("body", JSON.parse(body));
+    } catch {
+      return body.slice(0, maxLoggedBodyLength);
+    }
+  }
+
+  if (contentType?.includes("application/x-www-form-urlencoded")) {
+    return redactRecord(Object.fromEntries(new URLSearchParams(body)));
+  }
+
+  return body.slice(0, maxLoggedBodyLength);
+};
+
+const formatRequestBody = (body: unknown, headers: Record<string, string>) => {
+  const contentType = Object.entries(headers).find(([key]) => key.toLowerCase() === "content-type")?.[1];
+
+  if (!body) {
+    return undefined;
+  }
+
+  if (body instanceof URLSearchParams) {
+    return redactRecord(Object.fromEntries(body));
+  }
+
+  if (typeof body === "string") {
+    return parseBodyText(body, contentType);
+  }
+
+  if (body instanceof Uint8Array) {
+    return parseBodyText(Buffer.from(body).toString("utf8"), contentType);
+  }
+
+  return "[stream]";
+};
+
+const formatResponseBody = async (response: Response) => {
+  const contentType = response.headers.get("content-type") ?? undefined;
+  const text = await response.clone().text();
+  return parseBodyText(text, contentType);
+};
+
+const oidcWireFetch: OidcCustomFetch = async (url, options) => {
+  const startedAt = Date.now();
+  const headers = options.headers ?? {};
+  const logBody = logger.isLevelEnabled("debug");
+
+  logger.debug(
+    {
+      method: options.method,
+      url,
+      headers: redactRecord(headers),
+      body: logBody ? formatRequestBody(options.body, headers) : undefined
+    },
+    "OIDC provider request"
+  );
+
+  try {
+    const response = await fetch(url, options as RequestInit);
+
+    logger.debug(
+      {
+        method: options.method,
+        url,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+        headers: redactRecord(Object.fromEntries(response.headers.entries())),
+        body: logBody ? await formatResponseBody(response) : undefined
+      },
+      "OIDC provider response"
+    );
+
+    return response;
+  } catch (error) {
+    logger.debug(
+      {
+        method: options.method,
+        url,
+        durationMs: Date.now() - startedAt,
+        error
+      },
+      "OIDC provider request failed"
+    );
+    throw error;
+  }
+};
+
 const getOidcConfiguration = async () => {
   if (oidcConfiguration) {
     return oidcConfiguration;
@@ -39,11 +168,13 @@ const getOidcConfiguration = async () => {
 
   const client = await loadOpenIdClient();
   const issuerUrl = new URL(env.OIDC_ISSUER_URL);
-  const discoveryOptions = isLocalHttpIssuer(issuerUrl)
-    ? {
-        execute: [client.allowInsecureRequests]
-      }
-    : undefined;
+  const discoveryOptions: OidcDiscoveryRequestOptions = {
+    [client.customFetch]: oidcWireFetch
+  };
+
+  if (isLocalHttpIssuer(issuerUrl)) {
+    discoveryOptions.execute = [client.allowInsecureRequests];
+  }
 
   oidcConfiguration = await client.discovery(
     issuerUrl,
@@ -54,6 +185,7 @@ const getOidcConfiguration = async () => {
     client.ClientSecretPost(env.OIDC_CLIENT_SECRET),
     discoveryOptions
   );
+  oidcConfiguration[client.customFetch] = oidcWireFetch;
 
   return oidcConfiguration;
 };
