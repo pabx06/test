@@ -8,7 +8,7 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "provider": "mock-oidc-provider --port ${OIDC_PROVIDER_PORT:-8092} --users ./mock-users.yaml",
     "smoke:oidc": "bash scripts/smoke-oidc.sh",
-    "start": "node dist/server.js",
+    "start": "node --enable-source-maps dist/server.js",
     "test": "node -e \"console.log('test scaffold placeholder')\""
   },
   "dependencies": {
