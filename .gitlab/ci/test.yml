@@ -82,3 +82,28 @@ smoke_backend_services:
     when: on_failure
     paths:
       - backend-smoke.log
+
+smoke_oidc_auth:
+  stage: smoke
+  image: $CI_TOOLS_IMAGE
+  before_script:
+    - |
+      NPMRC_PATH="$HOME/.npmrc"
+      : > "$NPMRC_PATH"
+      if [ -n "${NPM_REGISTRY_URL:-}" ]; then
+        printf "registry=%s\n" "$NPM_REGISTRY_URL" > "$NPMRC_PATH"
+        if [ -n "${NPM_TOKEN:-}" ] && [ -n "${NPM_REGISTRY_AUTH_PATH:-}" ]; then
+          printf "//%s:_authToken=%s\n" "$NPM_REGISTRY_AUTH_PATH" "$NPM_TOKEN" >> "$NPMRC_PATH"
+          printf "always-auth=true\n" >> "$NPMRC_PATH"
+        fi
+        printf "strict-ssl=%s\n" "${NPM_STRICT_SSL:-true}" >> "$NPMRC_PATH"
+      fi
+  script:
+    - cd backend
+    - npm ci
+    - npm run build
+    - npm run smoke:oidc
+  artifacts:
+    when: on_failure
+    paths:
+      - oidc-smoke-logs/
